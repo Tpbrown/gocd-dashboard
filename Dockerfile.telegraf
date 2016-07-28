@@ -1,3 +1,4 @@
 # docker build -t gocd_telegraf -f Dockerfile.telegraf .
 FROM telegraf:1.0.0-beta3-alpine
-RUN apk --no-cache add curl
+# py-requests exists in Alpine repo, but py-click does not.  Using pip instead
+RUN apk --no-cache add curl python py-pip && pip install requests click

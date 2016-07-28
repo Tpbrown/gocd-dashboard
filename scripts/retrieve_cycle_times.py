@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 #
 # This dirty little script pulls in pipeline & stage timings from GoCD
+# NOTE: Start/End times are milliseconds since the epoch.  Duration is also milliseconds.
 #
 from __future__ import print_function
+import click
 import requests
 import time
 import sys
@@ -16,8 +18,9 @@ def _url(path):
 def get_pipeline_execution(counter='latest'):
     pass
 
-def find_good_run_in_page(pipelines,ignored_stages=None):
+def find_good_runs(pipelines,max_depth,ignored_stages=None):
     # Build a running list of stages that passed, and a running list of stages that didn't.
+    good_runs=list()
     stages_pass=dict()
     stages_notpass=dict()
     for run in pipelines:
@@ -35,27 +38,39 @@ def find_good_run_in_page(pipelines,ignored_stages=None):
                 stages_pass[stage['name']]=True
 
         if good_run:
-            return(run['counter'])
+            good_runs.append(run['counter'])
+            if len(good_runs) >= max_depth:
+                return(good_runs)
+
+    if len(good_runs) > 0:
+        return good_runs
+
+    # Pipeline had no successes, even partial.
+    if ignored_stages!=None and len(good_runs)<1:
+        return None
 
     # No passing full pipeline runs (all stages) found
     # Whittle the notpass list down to those stages who have never passed.
     for stage in stages_notpass.keys():
         if stage in stages_pass:
             stages_notpass.pop(stage)
+
     # Try again, but ignore those stages.  This is useful for manual gates -- like a rollback that's never occurred.
     eprint("WARNING no %s pipeline executions found with all stages passing.  Trying again but ignoring %s." % (pipelines[0]['name'],stages_notpass.keys()))
-    return find_good_run_in_page(pipelines,stages_notpass)
+    return find_good_runs(pipelines,max_depth,stages_notpass)
 
-def get_pipeline_last_passed(pipeline):
+# retrieve a list of pipeline runs that were good, up to a limit of max_depth.
+#
+def get_pipeline_successes(pipeline,max_depth):
     retval = None
     r = requests.get(_url("/go/api/pipelines/%s/history" % pipeline), auth=('view','password'))
     if r.status_code != 200:
         raise Exception("Cannot retrieve pipeline %s history." % pipeline)
 
     # Scan the last few executions
-    retval = find_good_run_in_page(r.json()['pipelines'])
+    retval = find_good_runs(r.json()['pipelines'],max_depth)
 
-    if retval == None:
+    if retval == None or len(retval) < max_depth:
         # No recent passing run.  Walk the history backwards.
         max_counter = r.json()['pagination']['total']
         page_size = r.json()['pagination']['page_size']
@@ -65,8 +80,8 @@ def get_pipeline_last_passed(pipeline):
             if r.status_code != 200:
                 raise Exception("Cannot retrieve pipeline %s history." % pipeline)
             # check the next page
-            retval = find_good_run_in_page(r.json()['pipelines'])
-            if retval != None:
+            retval += find_good_runs(r.json()['pipelines'],max_depth-len(retval))
+            if retval != None and len(retval) >= max_depth:
                 break
 
             offset+=10
@@ -106,37 +121,43 @@ def get_stage_ms_timing(pipeline,pcounter,stage,scounter):
         start=end=0
     return (start,end,end-start)
 
-def retrieve_gocd_metrics():
-    r = requests.get(_url('/go/api/config/pipeline_groups'), auth=('view','password'))
-    if r.status_code == 200:
-        for group in r.json():
-            for pipeline in group['pipelines']:
-                last_passed = get_pipeline_last_passed(pipeline['name'])
-                pl_start = int(time.time()*1000)
-                pl_end = 0
-                if last_passed != None:
-                    # Grab the instance for details
-                    pipeline_url = "/go/api/pipelines/%s/instance/%s" % (pipeline['name'],last_passed)
-                    run = requests.get(_url(pipeline_url), auth=('view','password'))
-                    first_schedule = get_stages_first_schedule(run.json()['stages'])
-                    for stage in run.json()['stages']:
-                        (start,end,duration) = get_stage_ms_timing(pipeline['name'],run.json()['counter'],stage['name'],stage['counter'])
-                        print("pl_stage_cycle_time,pipeline=%s,plctr=%d,stage=%s start=%d,end=%d,duration=%d" % (pipeline['name'],run.json()['counter'],stage['name'],start,end,duration))
-                        if start < pl_start:
-                            pl_start = start
-                        if end > pl_end:
-                            pl_end = end
-                print("pl_cycle_time,pipeline=%s start=%d,end=%d,duration=%d" % (pipeline['name'],pl_start,pl_end,pl_end-pl_start))
+@click.command()
+@click.option('--max-depth', '-d', default=1, type=click.IntRange(0,9999),help='Maximum number of pipeline executions to retrieve. 0 indicates unlimited, default is 1. This value applies per pipeline.')
+@click.option('--pipeline','-p', type=click.STRING, multiple=True, help="Pipeline to retrieve. Default is all. Can be specified multiple times: -p foo -p bar")
+def retrieve_gocd_metrics(max_depth,pipeline):
+    # If they've requested unlimited history we actually stop at maxint
+    if max_depth==0:
+        max_depth=sys.maxint
 
-                    # print run.json()
-                # for stage in pipeline['stages']:
-                #     print "\t\t",stage['name']
-                #     # stage detais
-                #     stage_url = "/go/api/stages/%s/%s/history" % (pipeline['name'],stage['name'])
-                #     # stage_url = "/go/api/stages/%s/%s/instance/1/1" % (pipeline['name'],stage['name'])
-                #     # GET /go/api/stages/:pipeline_name/:stage_name/history
-                #     rstage = requests.get(_url(stage_url), auth=('view','password'))
-                #     for stage_event in rstage.json():
-                #         print "event ", stage_event
+    source_list = list(pipeline)
+    if not source_list:
+        # Retrieve a list of all pipelines.  You have to get all groups, then extract the pipelines
+        r = requests.get(_url('/go/api/config/pipeline_groups'), auth=('view','password'))
+        if r.status_code == 200:
+            # List of all pipeline groups
+            for group in r.json():
+                # List of all pipelines
+                for found in group['pipelines']:
+                    source_list.append(found['name'])
 
-retrieve_gocd_metrics()
+    for pipeline in source_list:
+        pipeline_successes = get_pipeline_successes(pipeline,max_depth)
+        for counter in pipeline_successes:
+            pl_start = int(time.time()*1000)
+            pl_end = 0
+            # If it ran grab the details from the execution instance
+            pipeline_url = "/go/api/pipelines/%s/instance/%s" % (pipeline,counter)
+            run = requests.get(_url(pipeline_url), auth=('view','password'))
+
+            first_schedule = get_stages_first_schedule(run.json()['stages'])
+            for stage in run.json()['stages']:
+                (start,end,duration) = get_stage_ms_timing(pipeline,run.json()['counter'],stage['name'],stage['counter'])
+                print("stage_cycle_time,pipeline=%s,pipeline_counter=%d,stage=%s,stage_counter=%s start=%d,end=%d,duration=%d" % (pipeline,counter,stage['name'],stage['counter'],start,end,duration))
+                if start < pl_start:
+                    pl_start = start
+                if end > pl_end:
+                    pl_end = end
+            print("pipeline_cycle_time,pipeline=%s,pipeline_counter=%d start=%d,end=%d,duration=%d" % (pipeline,counter,pl_start,pl_end,pl_end-pl_start))
+
+if __name__ == '__main__':
+    retrieve_gocd_metrics()
