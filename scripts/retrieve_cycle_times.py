@@ -18,73 +18,63 @@ def _url(path):
 def get_pipeline_execution(counter='latest'):
     pass
 
-def find_good_runs(pipelines,max_depth,ignored_stages=None):
+def find_good_runs(pipelines,max_depth,exclude_stage):
     # Build a running list of stages that passed, and a running list of stages that didn't.
     good_runs=list()
-    stages_pass=dict()
-    stages_notpass=dict()
     for run in pipelines:
-        good_run = True
         for stage in run['stages']:
-            # Just skip any ignored stages
-            if ignored_stages != None and stage['name'] in ignored_stages:
+            if (stage['name'] in exclude_stage ) or (not stage['scheduled']) or (stage['result'] != u'Passed'):
                 continue
-
-            if not stage['scheduled'] or stage['result'] != u'Passed':
-                stages_notpass[stage['name']]=True
-                good_run = False
-                continue
+            if good_runs == None:
+                good_runs = list(run['counter'])
             else:
-                stages_pass[stage['name']]=True
-
-        if good_run:
-            good_runs.append(run['counter'])
+                good_runs.append(run['counter'])
             if len(good_runs) >= max_depth:
                 return(good_runs)
 
     if len(good_runs) > 0:
         return good_runs
 
-    # Pipeline had no successes, even partial.
-    if ignored_stages!=None and len(good_runs)<1:
-        return None
+    return None
 
-    # No passing full pipeline runs (all stages) found
-    # Whittle the notpass list down to those stages who have never passed.
-    for stage in stages_notpass.keys():
-        if stage in stages_pass:
-            stages_notpass.pop(stage)
-
-    # Try again, but ignore those stages.  This is useful for manual gates -- like a rollback that's never occurred.
-    eprint("WARNING no %s pipeline executions found with all stages passing.  Trying again but ignoring %s." % (pipelines[0]['name'],stages_notpass.keys()))
-    return find_good_runs(pipelines,max_depth,stages_notpass)
 
 # retrieve a list of pipeline runs that were good, up to a limit of max_depth.
 #
-def get_pipeline_successes(pipeline,max_depth):
+def get_pipeline_successes(pipeline,max_depth,exclude_stage):
     retval = None
     r = requests.get(_url("/go/api/pipelines/%s/history" % pipeline), auth=('view','password'))
     if r.status_code != 200:
         raise Exception("Cannot retrieve pipeline %s history." % pipeline)
 
     # Scan the last few executions
-    retval = find_good_runs(r.json()['pipelines'],max_depth)
+    retval = find_good_runs(r.json()['pipelines'],max_depth,exclude_stage)
 
     if retval == None or len(retval) < max_depth:
         # No recent passing run.  Walk the history backwards.
         max_counter = r.json()['pagination']['total']
         page_size = r.json()['pagination']['page_size']
         offset = page_size
-        while offset <= max_counter:
+        while offset < max_counter:
             r = requests.get(_url("/go/api/pipelines/%s/history/%i" % (pipeline,offset)), auth=('view','password'))
             if r.status_code != 200:
                 raise Exception("Cannot retrieve pipeline %s history." % pipeline)
             # check the next page
-            retval += find_good_runs(r.json()['pipelines'],max_depth-len(retval))
-            if retval != None and len(retval) >= max_depth:
+            if retval == None:
+                found = 0
+            else:
+                found = len(retval)
+            new_matches = find_good_runs(r.json()['pipelines'],max_depth-found,exclude_stage)
+            if new_matches != None:
+                try:
+                    retval += new_matches
+                except TypeError:
+                    retval = new_matches
+
+            # stop if we've hit max depth or have exhausted our list
+            if (retval != None and len(retval) >= max_depth) or (len(r.json()['pipelines']) < page_size):
                 break
 
-            offset+=10
+            offset+=page_size
             if offset > max_counter:
                 offset = max_counter
 
@@ -124,7 +114,8 @@ def get_stage_ms_timing(pipeline,pcounter,stage,scounter):
 @click.command()
 @click.option('--max-depth', '-d', default=1, type=click.IntRange(0,9999),help='Maximum number of pipeline executions to retrieve. 0 indicates unlimited, default is 1. This value applies per pipeline.')
 @click.option('--pipeline','-p', type=click.STRING, multiple=True, help="Pipeline to retrieve. Default is all. Can be specified multiple times: -p foo -p bar")
-def retrieve_gocd_metrics(max_depth,pipeline):
+@click.option('--exclude-stage','-x', type=click.STRING, multiple=True, help="Ignore stages named TEXT in any pipeline. Useful for stages that handle exception conditions - rollback for example. Can be specified multiple times: -x foo -x bar")
+def retrieve_gocd_metrics(max_depth,pipeline,exclude_stage):
     # If they've requested unlimited history we actually stop at maxint
     if max_depth==0:
         max_depth=sys.maxint
@@ -141,7 +132,7 @@ def retrieve_gocd_metrics(max_depth,pipeline):
                     source_list.append(found['name'])
 
     for pipeline in source_list:
-        pipeline_successes = get_pipeline_successes(pipeline,max_depth)
+        pipeline_successes = get_pipeline_successes(pipeline,max_depth,exclude_stage)
         for counter in pipeline_successes:
             pl_start = int(time.time()*1000)
             pl_end = 0
@@ -151,13 +142,14 @@ def retrieve_gocd_metrics(max_depth,pipeline):
 
             first_schedule = get_stages_first_schedule(run.json()['stages'])
             for stage in run.json()['stages']:
-                (start,end,duration) = get_stage_ms_timing(pipeline,run.json()['counter'],stage['name'],stage['counter'])
-                print("stage_cycle_time,pipeline=%s,pipeline_counter=%d,stage=%s,stage_counter=%s start=%d,end=%d,duration=%d" % (pipeline,counter,stage['name'],stage['counter'],start,end,duration))
-                if start < pl_start:
-                    pl_start = start
-                if end > pl_end:
-                    pl_end = end
-            print("pipeline_cycle_time,pipeline=%s,pipeline_counter=%d start=%d,end=%d,duration=%d" % (pipeline,counter,pl_start,pl_end,pl_end-pl_start))
+                if stage['name'] not in exclude_stage:
+                    (start,end,duration) = get_stage_ms_timing(pipeline,run.json()['counter'],stage['name'],stage['counter'])
+                    print("stage_cycle_time,pipeline=%s,pipeline_counter=%d,stage=%s,stage_counter=%s start=%di,end=%di,duration=%di %d" % (pipeline,counter,stage['name'],stage['counter'],start,end,duration,start*1000000))
+                    if start < pl_start:
+                        pl_start = start
+                    if end > pl_end:
+                        pl_end = end
+            print("pipeline_cycle_time,pipeline=%s,pipeline_counter=%d start=%di,end=%di,duration=%di %d" % (pipeline,counter,pl_start,pl_end,pl_end-pl_start,pl_start*1000000))
 
 if __name__ == '__main__':
     retrieve_gocd_metrics()
