@@ -62,4 +62,4 @@ The format is **measurement**,\[**tag=value**,tag=value,...\] **field=value**,fi
 # Known issues
 - ~~GoCD host and credentials are hard-coded to http://build.go.cd.  They'll be extracted to ENV vars.~~
 - ~~No use of shared session~~
-- No caching/eTag support yet; each sampling can be a duplicate of the last
+- No caching/eTag support yet; each sampling can be a duplicate of the last.  I'm not sure this matters from a data quality POV as the measurement timestamp wouldn't change.
