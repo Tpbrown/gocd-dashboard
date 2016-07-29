@@ -134,22 +134,27 @@ def retrieve_gocd_metrics(max_depth,pipeline,exclude_stage):
     for pipeline in source_list:
         pipeline_successes = get_pipeline_successes(pipeline,max_depth,exclude_stage)
         for counter in pipeline_successes:
-            pl_start = int(time.time()*1000)
+            first_mod_time=pl_start = int(time.time()*1000)
             pl_end = 0
             # If it ran grab the details from the execution instance
             pipeline_url = "/go/api/pipelines/%s/instance/%s" % (pipeline,counter)
             run = requests.get(_url(pipeline_url), auth=('view','password'))
+            # find first modification time
+            for matrev in run.json()['build_cause']['material_revisions']:
+                for mod in matrev['modifications']:
+                    if mod['modified_time'] < first_mod_time:
+                        first_mod_time=mod['modified_time']
 
             first_schedule = get_stages_first_schedule(run.json()['stages'])
             for stage in run.json()['stages']:
                 if stage['name'] not in exclude_stage:
                     (start,end,duration) = get_stage_ms_timing(pipeline,run.json()['counter'],stage['name'],stage['counter'])
-                    print("stage_cycle_time,pipeline=%s,pipeline_counter=%d,stage=%s,stage_counter=%s start=%di,end=%di,duration=%di %d" % (pipeline,counter,stage['name'],stage['counter'],start,end,duration,start*1000000))
+                    print("stage_cycle_time,pipeline=%s,pipeline_counter=%d,stage=%s,stage_counter=%s start=%di,end=%di,duration=%di,change=%di,duration_from_change=%di %d" % (pipeline,counter,stage['name'],stage['counter'],start,end,duration,first_mod_time,end-first_mod_time,start*1000000))
                     if start < pl_start:
                         pl_start = start
                     if end > pl_end:
                         pl_end = end
-            print("pipeline_cycle_time,pipeline=%s,pipeline_counter=%d start=%di,end=%di,duration=%di %d" % (pipeline,counter,pl_start,pl_end,pl_end-pl_start,pl_start*1000000))
+            print("pipeline_cycle_time,pipeline=%s,pipeline_counter=%d start=%di,end=%di,duration=%di,change=%di,duration_from_change=%di %d" % (pipeline,counter,pl_start,pl_end,pl_end-pl_start,first_mod_time,end-first_mod_time,pl_start*1000000))
 
 if __name__ == '__main__':
     retrieve_gocd_metrics()
