@@ -11,17 +11,23 @@ Includes three scripts for gathering data.
 Options:
   -d, --max-depth INTEGER RANGE  Maximum number of pipeline executions to
                                  retrieve. 0 indicates unlimited, default is
-                                 1. This value applies per pipeline.
+                                 1. This value applies per pipeline.(Can set
+                                 via environment with GOCD_METRICS_DEPTH)
   -P, --pipeline TEXT            Pipeline to retrieve. Default is all. Can be
                                  specified multiple times: -p foo -p bar
+                                 (GOCD_METRICS_PIPELINES)
   -x, --exclude-stage TEXT       Ignore stages named TEXT in any pipeline.
                                  Useful for stages that handle exception
                                  conditions - rollback for example. Can be
                                  specified multiple times: -x foo -x bar
+                                 (GOCD_METRICS_EXCLUDE)
   -u, --username TEXT            User to authenticate as.
+                                 (GOCD_METRICS_USERNAME)
   -p, --password TEXT            Password to authenticate with.
+                                 (GOCD_METRICS_PASSWORD)
   -H, --host TEXT                URL of GoCD server host to use. e.x.
                                  http://build.go.cd
+                                 (GO_SERVER_URL)
   --help                         Show this message and exit.
 ```
 ## Sample output
@@ -54,5 +60,6 @@ The format is **measurement**,\[**tag=value**,tag=value,...\] **field=value**,fi
 - Create an initial data load: ```scripts/retrieve_cycle_times.py --max-depth 0>bulk_data.txt```, then load via InfluxDB admin UI.
 
 # Known issues
-- GoCD host and credentials are hard-coded to http://build.go.cd.  They'll be extracted to ENV vars.
+- ~~GoCD host and credentials are hard-coded to http://build.go.cd.  They'll be extracted to ENV vars.~~
+- ~~No use of shared session~~
 - No caching/eTag support yet; each sampling can be a duplicate of the last

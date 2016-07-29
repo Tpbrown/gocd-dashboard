@@ -128,12 +128,12 @@ def get_stage_ms_timing(pipeline,pcounter,stage,scounter):
     return (start,end,end-start)
 
 @click.command()
-@click.option('--max-depth', '-d', envvar='GOCD_METRICS_DEPTH', default=1, type=click.IntRange(0,9999),help='Maximum number of pipeline executions to retrieve. 0 indicates unlimited, default is 1. This value applies per pipeline.')
-@click.option('--pipeline','-P', envvar='GOCD_METRICS_PIPELINES', type=click.STRING, multiple=True, help="Pipeline to retrieve. Default is all. Can be specified multiple times: -p foo -p bar")
-@click.option('--exclude-stage','-x', envvar='GOCD_METRICS_EXCLUDE', type=click.STRING, multiple=True, help="Ignore stages named TEXT in any pipeline. Useful for stages that handle exception conditions - rollback for example. Can be specified multiple times: -x foo -x bar")
-@click.option('--username','-u', envvar='GOCD_METRICS_USERNAME', default='view', type=click.STRING, help="User to authenticate as.")
-@click.option('--password','-p', envvar='GOCD_METRICS_PASSWORD', default='password', type=click.STRING, help="Password to authenticate with.")
-@click.option('--host','-H', envvar='GO_SERVER_URL', default='http://build.go.cd', type=click.STRING, help="URL of GoCD server host to use. e.x. http://build.go.cd")
+@click.option('--max-depth', '-d', envvar='GOCD_METRICS_DEPTH', default=1, type=click.IntRange(0,9999),help='Maximum number of pipeline executions to retrieve. 0 indicates unlimited, default is 1. This value applies per pipeline.(Can set via environment with GOCD_METRICS_DEPTH)')
+@click.option('--pipeline','-P', envvar='GOCD_METRICS_PIPELINES', type=click.STRING, multiple=True, help="Pipeline to retrieve. Default is all. Can be specified multiple times: -p foo -p bar\n(GOCD_METRICS_PIPELINES)")
+@click.option('--exclude-stage','-x', envvar='GOCD_METRICS_EXCLUDE', type=click.STRING, multiple=True, help="Ignore stages named TEXT in any pipeline. Useful for stages that handle exception conditions - rollback for example. Can be specified multiple times: -x foo -x bar\n(GOCD_METRICS_EXCLUDE)")
+@click.option('--username','-u', envvar='GOCD_METRICS_USERNAME', default='view', type=click.STRING, help="User to authenticate as.\n(GOCD_METRICS_USERNAME)")
+@click.option('--password','-p', envvar='GOCD_METRICS_PASSWORD', default='password', type=click.STRING, help="Password to authenticate with.\n(GOCD_METRICS_PASSWORD)")
+@click.option('--host','-H', envvar='GO_SERVER_URL', default='http://build.go.cd', type=click.STRING, help="URL of GoCD server host to use. e.x. http://build.go.cd\n(GO_SERVER_URL)")
 def retrieve_gocd_metrics(max_depth,pipeline,exclude_stage,username,password,host):
     initialize_gocd(username, password, host)
     # If they've requested unlimited history we actually stop at maxint
