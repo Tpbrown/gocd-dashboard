@@ -34,6 +34,7 @@ The format is **measurement**,\[**tag=value**,tag=value,...\] **field=value**,fi
  - **change** = time of _earliest_ change in the modification list
  - **duration** = end - start.  **_This represents cycle time from schedule to complete._**
  - **duration_from_change** = end - change.  **_This represents cycle time from _change_ to complete._**
+
 ### Typical usage
 - invoke scripts/retrieve_cycle_times.py on a regular basis with no --max-depth specified.
 - Create an initial data load: ```scripts/retrieve_cycle_times.py --max-depth 0>bulk_data.txt```, then load via InfluxDB admin UI.
