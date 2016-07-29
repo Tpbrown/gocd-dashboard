@@ -32,8 +32,8 @@ The format is **measurement**,\[**tag=value**,tag=value,...\] **field=value**,fi
  - **start** time when pipeline/stage was scheduled to execute
  - **end** time when pipeline/stage was completed, including publishing of results
  - **change** time of _earliest_ change in the modification list
- - **duration** end - start.  **_This represents cycle time from schedule to complete._**
- - **duration_from_change** end - change.  **_This represents cycle time from _change_ to complete._**
+ - **duration** end - start.  **This represents cycle time from _schedule_ to complete.**
+ - **duration_from_change** end - change.  **This represents cycle time from _change_ to complete.**
 
 #### Timestamp:
  - The measurement timestamp is the end time in nanoseconds
