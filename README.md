@@ -9,12 +9,21 @@ Includes three scripts for gathering data.
 ## retrieve_cycle_times.py
 ```
 Options:
-  -d, --max-depth INTEGER RANGE  Maximum number of pipeline executions to retrieve. 0 indicates unlimited, default is
+  -d, --max-depth INTEGER RANGE  Maximum number of pipeline executions to
+                                 retrieve. 0 indicates unlimited, default is
                                  1. This value applies per pipeline.
-  -p, --pipeline TEXT            Pipeline to retrieve. Default is all. Can be specified multiple times: -p foo -p bar
-  -x, --exclude-stage TEXT       Ignore stages named TEXT in any pipeline. Useful for stages that handle exception
-                                 conditions - rollback for example. Can be specified multiple times: -x foo -x bar
-  ```
+  -P, --pipeline TEXT            Pipeline to retrieve. Default is all. Can be
+                                 specified multiple times: -p foo -p bar
+  -x, --exclude-stage TEXT       Ignore stages named TEXT in any pipeline.
+                                 Useful for stages that handle exception
+                                 conditions - rollback for example. Can be
+                                 specified multiple times: -x foo -x bar
+  -u, --username TEXT            User to authenticate as.
+  -p, --password TEXT            Password to authenticate with.
+  -H, --host TEXT                URL of GoCD server host to use. e.x.
+                                 http://build.go.cd
+  --help                         Show this message and exit.
+```
 ## Sample output
 ```./scripts/retrieve_cycle_times.py -p build-linux``` :
 ```
