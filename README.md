@@ -22,7 +22,7 @@ stage_cycle_time,pipeline=build-linux,pipeline_counter=1108,stage=build-non-serv
 stage_cycle_time,pipeline=build-linux,pipeline_counter=1108,stage=build-server,stage_counter=1 start=1469777960991i,end=1469780344707i,duration=2383716i,change=1469777264000i,duration_from_change=3080707i 1469777960991000000
 pipeline_cycle_time,pipeline=build-linux,pipeline_counter=1108 start=1469777411530i,end=1469780344707i,duration=2933177i,change=1469777264000i,duration_from_change=3080707i 1469777411530000000  
 ```
-The format is **measurement**,[**tag=value**,tag=value,...](space)**field=value**,field=value,...(space)**timestamp**
+The format is **measurement**,[**tag=value**,tag=value,...] **field=value**,field=value,... **timestamp**
 
 #### Measurements:
  - **stage_cycle_time** - data representing a single stage execution
