@@ -25,15 +25,15 @@ pipeline_cycle_time,pipeline=build-linux,pipeline_counter=1108 start=14697774115
 The format is **measurement**,\[**tag=value**,tag=value,...\] **field=value**,field=value,... **timestamp**.  For specifics please refer to [InfluxDB line protocol](https://docs.influxdata.com/influxdb/latest/write_protocols/line/).
 
 #### Measurements:
- - **stage_cycle_time** - data representing a single stage execution
- - **pipeline_cycle_time** - data representing a pipeline execution (including stages)
+ - **stage_cycle_time** data representing a single stage execution
+ - **pipeline_cycle_time** data representing a pipeline execution (including stages)
 
 #### Fields:
- - **start** = time when pipeline/stage was scheduled to execute
- - **end** = time when pipeline/stage was completed, including publishing of results
- - **change** = time of _earliest_ change in the modification list
- - **duration** = end - start.  **_This represents cycle time from schedule to complete._**
- - **duration_from_change** = end - change.  **_This represents cycle time from _change_ to complete._**
+ - **start** time when pipeline/stage was scheduled to execute
+ - **end** time when pipeline/stage was completed, including publishing of results
+ - **change** time of _earliest_ change in the modification list
+ - **duration** end - start.  **_This represents cycle time from schedule to complete._**
+ - **duration_from_change** end - change.  **_This represents cycle time from _change_ to complete._**
 
 #### Timestamp:
  - The measurement timestamp is the end time in nanoseconds
